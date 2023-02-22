@@ -1,12 +1,12 @@
 plugins {
-    kotlin("jvm") version "1.8.0"
+    kotlin("jvm")
     application
 }
 
 group = "org.xBaank"
 version = "1.0-SNAPSHOT"
 
-val ktor_version : String by project
+val ktor_version: String by project
 
 repositories {
     mavenCentral()

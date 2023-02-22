@@ -15,6 +15,10 @@ val Amf0SupportedTypes = mapOf(
     0x11 to Amf0Type.AvmPlusObject
 )
 
+const val AMF0_START_MARKER = 0x03
+const val AMF0_END_MARKER = 0x09
+
+
 sealed interface Amf0Type {
     object Number : Amf0Type
     object Boolean : Amf0Type
