@@ -1,0 +1,4 @@
+package leagueRtmpProxy
+
+class LeagueProxyClient {
+}
