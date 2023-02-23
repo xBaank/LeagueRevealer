@@ -3,7 +3,6 @@ plugins {
     application
 }
 
-
 group = "org.xBaank"
 version = "1.0-SNAPSHOT"
 
@@ -16,8 +15,6 @@ repositories {
 dependencies {
     implementation("io.ktor:ktor-network:$ktor_version")
     implementation("io.ktor:ktor-network-tls:$ktor_version")
-    //coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.5.2")
     implementation(project(":RtmpClient"))
     testImplementation(kotlin("test"))
 }

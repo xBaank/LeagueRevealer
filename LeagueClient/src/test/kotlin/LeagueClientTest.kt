@@ -1,5 +1,5 @@
 import kotlinx.coroutines.runBlocking
-import leagueRtmpClient.LeagueClient
+import leagueClient.LeagueClient
 import org.junit.jupiter.api.Test
 
 class LeagueClientTest {

@@ -1,5 +1,5 @@
 rootProject.name = "LeagueRtmp"
-include(":Client", ":Proxy")
+include(":LeagueClient", ":Proxy", ":RtmpClient")
 pluginManagement {
     val kotlin_version: String by settings
     plugins {

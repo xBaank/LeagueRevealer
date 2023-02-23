@@ -1,9 +1,10 @@
-package leagueRtmpClient
+package leagueClient
 
 import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
 import io.ktor.network.tls.*
 import kotlinx.coroutines.Dispatchers
+import rtmpClient.RtmpClient
 
 class LeagueClient internal constructor(private val rtmpClient: RtmpClient) {
     suspend fun connect() {

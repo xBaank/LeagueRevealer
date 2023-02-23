@@ -9,8 +9,9 @@
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
-            <option value="$PROJECT_DIR$/Client" />
+            <option value="$PROJECT_DIR$/LeagueClient" />
             <option value="$PROJECT_DIR$/Proxy" />
+            <option value="$PROJECT_DIR$/RtmpClient" />
           </set>
         </option>
       </GradleProjectSettings>

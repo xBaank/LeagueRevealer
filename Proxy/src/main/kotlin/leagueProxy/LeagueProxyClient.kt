@@ -1,14 +1,25 @@
-package leagueRtmpProxy
+package leagueProxy
 
 import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
 import io.ktor.network.tls.*
+import io.ktor.utils.io.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.io.File
+import java.util.*
+
 
 class LeagueProxyClient internal constructor(private val serverSocket: ServerSocket, private val clientSocket: Socket) {
+    private val writer = run {
+        val file = File("C:\\Users\\Roberto\\Documents\\logs_rtmp\\log-${UUID.randomUUID()}.txt")
+        file.delete()
+        println(file.createNewFile())
+        file.writer()
+    }
+
     suspend fun start() = coroutineScope {
         while (isActive) {
             val socket = serverSocket.accept()
@@ -23,6 +34,9 @@ class LeagueProxyClient internal constructor(private val serverSocket: ServerSoc
         val clientReadChannel = clientSocket.openReadChannel()
         val clientWriteChannel = clientSocket.openWriteChannel(autoFlush = true)
 
+        //read handshakes
+        handshake(serverReadChannel, clientWriteChannel, clientReadChannel, serverWriteChannel)
+
 
         launch(Dispatchers.IO) {
             while (isActive) {
@@ -33,7 +47,7 @@ class LeagueProxyClient internal constructor(private val serverSocket: ServerSoc
                     socket.close()
                     return@launch
                 }
-                println(byteArray.decodeToString(0, bytes))
+                writer.write(byteArray.decodeToString(0, bytes))
                 println("Received from lol client $bytes bytes")
                 clientWriteChannel.writeFully(byteArray, 0, bytes)
             }
@@ -49,11 +63,40 @@ class LeagueProxyClient internal constructor(private val serverSocket: ServerSoc
                     socket.close()
                     return@launch
                 }
-                println(byteArray.decodeToString(0, bytes))
+                writer.write(byteArray.decodeToString(0, bytes))
                 println("Received from server $bytes bytes")
                 serverWriteChannel.writeFully(byteArray, 0, bytes)
             }
         }
+    }
+
+    private suspend fun handshake(
+        serverReadChannel: ByteReadChannel,
+        clientWriteChannel: ByteWriteChannel,
+        clientReadChannel: ByteReadChannel,
+        serverWriteChannel: ByteWriteChannel
+    ) {
+        val c0 = serverReadChannel.readByte()
+        clientWriteChannel.writeByte(c0)
+        val c1 = ByteArray(1536)
+        serverReadChannel.readFully(c1, 0, c1.size)
+        clientWriteChannel.writeFully(c1, 0, c1.size)
+
+        val s0 = clientReadChannel.readByte()
+        serverWriteChannel.writeByte(s0)
+        val s1 = ByteArray(1536)
+        clientReadChannel.readFully(s1, 0, s1.size)
+        serverWriteChannel.writeFully(s1, 0, s1.size)
+
+        if (s0 != c0) throw IllegalStateException("c0 and s0 are not equal")
+
+        val s0Echo = ByteArray(1536)
+        clientReadChannel.readFully(s0Echo, 0, s0Echo.size)
+        serverWriteChannel.writeFully(s0Echo, 0, s0Echo.size)
+
+        val c1Echo = ByteArray(1536)
+        serverReadChannel.readFully(c1Echo, 0, c1Echo.size)
+        clientWriteChannel.writeFully(c1Echo, 0, c1Echo.size)
     }
 }
 

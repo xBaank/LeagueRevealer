@@ -1,11 +1,15 @@
-package leagueRtmpClient
+package rtmpClient
 
 import io.ktor.network.sockets.*
-import leagueRtmpClient.packet.RTMPPacketDecoder
+import rtmpClient.packet.header.RTMPPacketDecoder
 import java.nio.ByteBuffer
+import kotlin.random.Random
 
+internal const val C0: Byte = 0x03
+internal const val C1_SIZE = 1536
+internal const val S1_SIZE = 1536
 
-class RtmpClient(val socket: Socket) {
+class RtmpClient(socket: Socket) {
     private val readChannel = socket.openReadChannel()
     private val writeChannel = socket.openWriteChannel(autoFlush = true)
     suspend fun handshake() {
@@ -37,13 +41,24 @@ class RtmpClient(val socket: Socket) {
     }
 
     suspend fun readMessage() {
-        val bytes = ByteArray(1024)
-        readChannel.readFully(bytes, 0, bytes.size)
-        println(bytes)
         val decoder = RTMPPacketDecoder(readChannel)
-        val header = decoder.readHeader()
-        val packet = decoder.readPayload(header)
+        val packet = decoder.readPayload()
     }
 
+
+    private fun generateC1(): ByteArray {
+        val c1 = ByteArray(C1_SIZE)
+        val timestamp = (System.currentTimeMillis() / 1000).toInt()
+        ByteBuffer.wrap(c1, 0, 4).putInt(timestamp)
+        ByteBuffer.wrap(c1, 5, 4).put(0)
+        Random.nextBytes(c1, 9)
+        return c1
+    }
+
+    private fun generateS1Echo(s1: ByteArray): ByteArray {
+        val timestamp = (System.currentTimeMillis() / 1000).toInt()
+        ByteBuffer.wrap(s1, 5, 4).putInt(timestamp)
+        return s1
+    }
 
 }

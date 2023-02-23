@@ -1,4 +1,4 @@
-package leagueRtmpClient.packet
+package rtmpClient.packet.header
 
 sealed interface RTMPPacketHeader
 class RTMPPacketHeader0(

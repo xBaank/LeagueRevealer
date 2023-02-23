@@ -1,5 +1,5 @@
 import kotlinx.coroutines.runBlocking
-import leagueRtmpProxy.LeagueProxyClient
+import leagueProxy.LeagueProxyClient
 import org.junit.jupiter.api.Test
 
 class LeagueProxyTest {

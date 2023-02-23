@@ -1,20 +1,23 @@
-package leagueRtmpClient.packet
+package rtmpClient.packet.header
 
 import io.ktor.utils.io.*
+import rtmpClient.amf.decoder.Amf0Decoder
 import java.nio.ByteBuffer.wrap
 
-const val CHUNCK_HEADER_TYPE_0: Byte = 0x00
-const val CHUNCK_HEADER_TYPE_1: Byte = 0x01
-const val CHUNCK_HEADER_TYPE_2: Byte = 0x02
-const val CHUNCK_HEADER_TYPE_3: Byte = 0x03
+internal const val CHUNCK_HEADER_TYPE_0: Byte = 0x00
+internal const val CHUNCK_HEADER_TYPE_1: Byte = 0x01
+internal const val CHUNCK_HEADER_TYPE_2: Byte = 0x02
+internal const val CHUNCK_HEADER_TYPE_3: Byte = 0x03
 
-const val TIMESTAMP_SIZE = 3
-const val LENGTH_SIZE = 3
-const val MESSAGE_ID_SIZE = 4
+
+internal const val TIMESTAMP_SIZE = 3
+internal const val LENGTH_SIZE = 3
+internal const val MESSAGE_ID_SIZE = 4
 
 class RTMPPacketDecoder(private val input: ByteReadChannel) {
+    private val amf0Decoder = Amf0Decoder(input)
 
-    suspend fun readHeader(): RTMPPacketHeader {
+    private suspend fun readHeader(): RTMPPacketHeader {
         val firstByte = input.readByte()
 
         if (firstByte == CHUNCK_HEADER_TYPE_3) {
@@ -73,19 +76,17 @@ class RTMPPacketDecoder(private val input: ByteReadChannel) {
         throw Exception("Invalid RTMP Packet Header")
     }
 
-    suspend fun readPayload(header: RTMPPacketHeader): ByteArray = when (header) {
+    suspend fun readPayload(): Unit = when (val header = readHeader()) {
         is RTMPPacketHeader0 -> {
             val length = wrap(header.length).int
-            val payload = ByteArray(length)
-            input.readFully(payload, 0, payload.size)
-            payload
+            val node = amf0Decoder.read()
+            println(node)
         }
 
         is RTMPPacketHeader1 -> {
             val length = wrap(header.length).int
-            val payload = ByteArray(length)
-            input.readFully(payload, 0, payload.size)
-            payload
+            val node = amf0Decoder.read()
+            println(node)
         }
 
         is RTMPPacketHeader2 -> {
