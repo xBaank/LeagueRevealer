@@ -1,4 +1,4 @@
-package leagueRtmpClient
+package leagueRtmpClient.amf0
 
 val Amf0SupportedTypes = mapOf(
     0x00 to Amf0Type.Number,
