@@ -1,15 +1,22 @@
-package rtmpClient.packet.header
+package rtmpClient.packet
 
 import java.nio.ByteBuffer
 
-sealed interface RTMPPacketHeader
+sealed interface RTMPPacketHeader {
+    /**
+     * Data that forms the header
+     */
+    val headerData: ByteArray
+}
+
 class RTMPPacketHeader0(
     val chunkHeaderType: Byte,
     val channelId: Byte,
     val timeStamp: ByteArray,
     val length: ByteArray,
     val messageTypeId: Byte,
-    val streamId: ByteArray
+    val streamId: ByteArray,
+    override val headerData: ByteArray
 ) : RTMPPacketHeader
 
 class RTMPPacketHeader1(
@@ -17,18 +24,21 @@ class RTMPPacketHeader1(
     val channelId: Byte,
     val timeStamp: ByteArray,
     val length: ByteArray,
-    val messageTypeId: Byte
+    val messageTypeId: Byte,
+    override val headerData: ByteArray
 ) : RTMPPacketHeader
 
 class RTMPPacketHeader2(
     val chunkHeaderType: Byte,
     val channelId: Byte,
-    val timeStamp: ByteArray
+    val timeStamp: ByteArray,
+    override val headerData: ByteArray
 ) : RTMPPacketHeader
 
 class RTMPPacketHeader3(
     val chunkHeaderType: Byte,
     val channelId: Byte,
+    override val headerData: ByteArray,
 ) : RTMPPacketHeader
 
 val RTMPPacketHeader.lengthAsInt: Int

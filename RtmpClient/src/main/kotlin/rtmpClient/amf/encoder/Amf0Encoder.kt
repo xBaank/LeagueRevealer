@@ -8,7 +8,7 @@ import java.nio.ByteBuffer
 
 class Amf0Encoder(val output: ByteWriteChannel) {
     suspend fun writeNumber(number: Amf0Number) {
-        output.writeByte(Amf0Number.type)
+        output.writeByte(Amf0Number.TYPE)
 
         val array = ByteArray(8)
         ByteBuffer.wrap(array).putDouble(number.value)
@@ -16,12 +16,12 @@ class Amf0Encoder(val output: ByteWriteChannel) {
     }
 
     suspend fun writeBoolean(boolean: Amf0Boolean) {
-        output.writeByte(Amf0Boolean.type)
+        output.writeByte(Amf0Boolean.TYPE)
         output.writeByte(if (boolean.value) 0x01 else 0x00)
     }
 
     suspend fun writeString(string: Amf0String) {
-        output.writeByte(Amf0String.type)
+        output.writeByte(Amf0String.TYPE)
 
         val stringArray = string.value.toByteArray()
         output.writeShort(stringArray.size)
@@ -29,7 +29,7 @@ class Amf0Encoder(val output: ByteWriteChannel) {
     }
 
     suspend fun writeObject(obj: Amf0Object) {
-        output.writeByte(Amf0Object.type)
+        output.writeByte(Amf0Object.TYPE)
         for (entry in obj.value) {
             writeString(entry.key.toAmf0String())
             write(entry.value)
@@ -40,7 +40,7 @@ class Amf0Encoder(val output: ByteWriteChannel) {
     }
 
     suspend fun writeNull() {
-        output.writeByte(Amf0Null.type)
+        output.writeByte(Amf0Null.TYPE)
     }
 
     suspend fun write(node: Amf0Node) {
@@ -51,6 +51,7 @@ class Amf0Encoder(val output: ByteWriteChannel) {
             is Amf0Number -> writeNumber(node)
             is Amf0Object -> writeObject(node)
             is Amf0String -> writeString(node)
+            else -> TODO()
         }
     }
 }
