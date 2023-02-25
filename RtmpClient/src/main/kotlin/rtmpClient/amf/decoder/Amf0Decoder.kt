@@ -1,46 +1,119 @@
 package rtmpClient.amf.decoder
 
-import io.ktor.utils.io.*
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.isActive
-import rtmpClient.amf.Amf0Node
-import rtmpClient.amf.Amf0Node.*
+import java.io.DataInputStream
+import java.io.IOException
+import java.util.*
 
-class Amf0Decoder(val input: ByteReadChannel) {
-    suspend fun read(): Amf0Node = coroutineScope {
+class AMF0Decoder(data: ByteArray) {
+
+    private val input = DataInputStream(data.inputStream())
+    fun decodeAll(): List<Any?> {
+        val result = mutableListOf<Any?>()
+        while (true) {
+            try {
+                val node = decode()
+                result.add(node)
+            } catch (e: IOException) {
+                println(e)
+                break
+            }
+        }
+        return result
+    }
+
+    @Throws(IOException::class)
+    fun decode(): Any? {
         val type = input.readByte()
-        when (type.toInt()) {
-            Amf0Number.type -> readNumber()
-            Amf0Boolean.type -> readBoolean()
-            Amf0String.type -> readString()
-            Amf0Object.type -> readObject()
-            Amf0Null.type -> readNull()
-            else -> throw Exception("Invalid AMF0 type: $type")
+        return when (type.toInt()) {
+            AMF0Types.NUMBER -> input.readDouble()
+            AMF0Types.BOOLEAN -> input.readByte() == 0x01.toByte()
+            AMF0Types.STRING -> readAMF0String()
+            AMF0Types.OBJECT -> readAMF0Object()
+            AMF0Types.NULL -> null
+            AMF0Types.UNDEFINED -> null
+            AMF0Types.ECMA_ARRAY -> readAMF0EcmaArray()
+            AMF0Types.STRICT_ARRAY -> readAMF0StrictArray()
+            AMF0Types.DATE -> readAMF0Date()
+            AMF0Types.TYPED_OBJECT -> readTypedObject()
+            else -> throw IOException("Unsupported AMF0 type: $type")
         }
     }
 
-    fun readNull() = Amf0Null
-
-    suspend fun readObject(): Amf0Object = coroutineScope {
-        val mutableMapOf = mutableMapOf<String, Amf0Node>()
-        val obj = Amf0Object(mutableMapOf)
-        while (isActive) {
-            val key = read() as? Amf0String ?: break
-            mutableMapOf[key.value] = read()
-        }
-        // skip the last three bytes of object end marker
-        input.discardExact(3)
-        obj
+    private fun readTypedObject(): Any? {
+        val objectName = readAMF0String()
+        val objectValue = readAMF0Object()
+        return objectName to objectValue
     }
 
-    suspend fun readString(): Amf0String {
+    @Throws(IOException::class)
+    private fun readAMF0String(): String {
         val length = input.readShort()
-        val byteArray = ByteArray(length.toInt())
-        input.readFully(byteArray)
-        return Amf0String(byteArray.decodeToString())
+        val buffer = ByteArray(length.toInt())
+        input.readFully(buffer)
+        return String(buffer, Charsets.UTF_8)
     }
 
-    suspend fun readBoolean() = Amf0Boolean(input.readByte() != 0.toByte())
+    @Throws(IOException::class)
+    private fun readAMF0Object(): Map<String, Any?> {
+        val result = mutableMapOf<String, Any?>()
+        while (true) {
+            val propertyName = readAMF0String()
+            if (propertyName.isEmpty()) {
+                val nextType = input.readByte().toInt()
+                if (nextType == AMF0Types.OBJECT_END) {
+                    break
+                } else {
+                    throw IOException("Invalid AMF0 object format")
+                }
+            } else {
+                val value = decode()
+                result[propertyName] = value
+            }
+        }
+        return result
+    }
 
-    suspend fun readNumber() = Amf0Number(input.readDouble())
+    @Throws(IOException::class)
+    private fun readAMF0EcmaArray(): Map<String, Any?> {
+        val length = input.readInt()
+        val result = mutableMapOf<String, Any?>()
+        for (i in 0 until length) {
+            val propertyName = readAMF0String()
+            val value = decode()
+            result[propertyName] = value
+        }
+        return result
+    }
+
+    @Throws(IOException::class)
+    private fun readAMF0StrictArray(): List<Any?> {
+        val length = input.readInt()
+        val result = mutableListOf<Any?>()
+        for (i in 0 until length) {
+            val value = decode()
+            result.add(value)
+        }
+        return result
+    }
+
+    @Throws(IOException::class)
+    private fun readAMF0Date(): Date {
+        val milliseconds = input.readDouble().toLong()
+        val timezoneOffset = input.readShort().toInt()
+        return Date(milliseconds)
+    }
+}
+
+object AMF0Types {
+    const val NUMBER = 0
+    const val BOOLEAN = 1
+    const val STRING = 2
+    const val OBJECT = 3
+    const val NULL = 5
+    const val UNDEFINED = 6
+    const val ECMA_ARRAY = 8
+    const val STRICT_ARRAY = 10
+    const val DATE = 11
+    const val OBJECT_END = 9
+    const val TYPED_OBJECT = 16
 }

@@ -9,7 +9,6 @@ import rtmpClient.RtmpClient
 class LeagueClient internal constructor(private val rtmpClient: RtmpClient) {
     suspend fun connect() {
         rtmpClient.handshake()
-        rtmpClient.readMessage()
     }
 
 }

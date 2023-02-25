@@ -3,6 +3,7 @@ import leagueProxy.LeagueProxyClient
 import org.junit.jupiter.api.Test
 
 class LeagueProxyTest {
+
     @Test
     fun `should proxy`(): Unit = runBlocking {
         val proxy =

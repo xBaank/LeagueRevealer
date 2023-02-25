@@ -1,7 +1,6 @@
 package rtmpClient
 
 import io.ktor.network.sockets.*
-import rtmpClient.packet.header.RTMPPacketDecoder
 import java.nio.ByteBuffer
 import kotlin.random.Random
 
@@ -38,11 +37,6 @@ class RtmpClient(socket: Socket) {
         val current = System.currentTimeMillis() / 1000
         //Allow 1 sec of difference
         if (current - c1EchoTimestamp > 1000) throw Exception("Invalid Timestamp")
-    }
-
-    suspend fun readMessage() {
-        val decoder = RTMPPacketDecoder(readChannel)
-        val packet = decoder.readPayload()
     }
 
 
