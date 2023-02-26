@@ -1,75 +1,74 @@
 package rtmpClient.amf
 
-import rtmpClient.amf.Amf0Node.*
 import java.util.*
 
-sealed interface Amf0Node {
-    @JvmInline
-    value class Amf0Number(val value: Double) : Amf0Node {
-        companion object {
-            const val TYPE = 0x00
-        }
+sealed interface Amf0Node
+
+@JvmInline
+value class Amf0Number(val value: Double) : Amf0Node {
+    companion object {
+        const val TYPE = 0x00
+    }
+}
+
+@JvmInline
+value class Amf0Boolean(val value: Boolean) : Amf0Node {
+    companion object {
+        const val TYPE = 0x01
+    }
+}
+
+@JvmInline
+value class Amf0String(val value: String) : Amf0Node, CharSequence by value {
+    companion object {
+        const val TYPE = 0x02
+    }
+}
+
+@JvmInline
+value class Amf0Object(val value: MutableMap<String, Amf0Node>) : Amf0Node {
+    companion object {
+        const val TYPE = 0x03
+        const val OBJECT_END = 0x09
+    }
+}
+
+data class Amf0TypedObject(val name: String, val value: MutableMap<String, Amf0Node>) : Amf0Node {
+    companion object {
+        const val TYPE = 0x10
     }
 
-    @JvmInline
-    value class Amf0Boolean(val value: Boolean) : Amf0Node {
-        companion object {
-            const val TYPE = 0x01
-        }
+    override fun toString(): String {
+        return "Amf0TypedObject(name='$name', value=$value)"
     }
+}
 
-    @JvmInline
-    value class Amf0String(val value: String) : Amf0Node, CharSequence by value {
-        companion object {
-            const val TYPE = 0x02
-        }
+object Amf0Null : Amf0Node {
+    const val TYPE = 0x05
+}
+
+object Amf0Undefined : Amf0Node {
+    const val TYPE = 0x06
+}
+
+@JvmInline
+value class Amf0ECMAArray(val value: MutableMap<String, Amf0Node>) : Amf0Node {
+    companion object {
+        const val TYPE = 0x08
     }
+}
 
-    @JvmInline
-    value class Amf0Object(val value: Map<String, Amf0Node>) : Amf0Node {
-        companion object {
-            const val TYPE = 0x03
-            const val OBJECT_END = 0x09
-        }
+@JvmInline
+value class Amf0Date(val date: Date) : Amf0Node {
+    companion object {
+        const val TYPE = 0x0B
     }
+}
 
-    data class Amf0TypedObject(val name: String, val value: Map<String, Amf0Node>) : Amf0Node {
-        companion object {
-            const val TYPE = 0x10
-        }
-
-        override fun toString(): String {
-            return "Amf0TypedObject(name='$name', value=$value)"
-        }
-    }
-
-    object Amf0Null : Amf0Node {
-        const val TYPE = 0x05
-    }
-
-    object Amf0Undefined : Amf0Node {
-        const val TYPE = 0x06
-    }
-
-    @JvmInline
-    value class Amf0ECMAArray(val value: Map<String, Amf0Node>) : Amf0Node {
-        companion object {
-            const val TYPE = 0x08
-        }
-    }
-
-    @JvmInline
-    value class Amf0Date(val date: Date) : Amf0Node {
-        companion object {
-            const val TYPE = 0x0B
-        }
-    }
-
-    @JvmInline
-    value class Amf0StrictArray(val value: List<Amf0Node>) : Amf0Node {
-        companion object {
-            const val TYPE = 0x0A
-        }
+@JvmInline
+value class Amf0StrictArray(val value: MutableList<Amf0Node>) : Amf0Node {
+    companion object {
+        const val TYPE = 0x0A
     }
 }
 
@@ -80,7 +79,51 @@ fun Boolean.toAmf0Boolean(): Amf0Boolean = Amf0Boolean(this)
 fun String.toAmf0String(): Amf0String = Amf0String(this)
 
 fun Nothing?.toAmf0Null(): Amf0Null = Amf0Null
-fun Map<String, Amf0Node>.toAmf0Object(): Amf0Object = Amf0Object(this)
-fun Map<String, Amf0Node>.toAmf0ECMAArray(): Amf0ECMAArray = Amf0ECMAArray(this)
+fun Map<String, Amf0Node>.toAmf0Object(): Amf0Object = Amf0Object(this.toMutableMap())
+fun Map<String, Amf0Node>.toAmf0ECMAArray(): Amf0ECMAArray = Amf0ECMAArray(this.toMutableMap())
 fun Date.toAmf0Date(): Amf0Date = Amf0Date(this)
-fun List<Amf0Node>.toAmf0StrictArray(): Amf0StrictArray = Amf0StrictArray(this)
+fun List<Amf0Node>.toAmf0StrictArray(): Amf0StrictArray = Amf0StrictArray(this.toMutableList())
+
+//safe extension functions for types
+fun Amf0Node?.toAmf0Number(): Amf0Number? = this as? Amf0Number
+fun Amf0Node?.toAmf0Boolean(): Amf0Boolean? = this as? Amf0Boolean
+fun Amf0Node?.toAmf0String(): Amf0String? = this as? Amf0String
+fun Amf0Node?.toAmf0Object(): Amf0Object? = this as? Amf0Object
+fun Amf0Node?.toAmf0TypedObject(): Amf0TypedObject? = this as? Amf0TypedObject
+fun Amf0Node?.toAmf0Null(): Amf0Null? = this as? Amf0Null
+fun Amf0Node?.toAmf0Undefined(): Amf0Undefined? = this as? Amf0Undefined
+fun Amf0Node?.toAmf0ECMAArray(): Amf0ECMAArray? = this as? Amf0ECMAArray
+fun Amf0Node?.toAmf0Date(): Amf0Date? = this as? Amf0Date
+fun Amf0Node?.toAmf0StrictArray(): Amf0StrictArray? = this as? Amf0StrictArray
+
+//getter functions for types
+operator fun Amf0Node.get(key: String): Amf0Node? = when (this) {
+    is Amf0Object -> value[key]
+    is Amf0TypedObject -> value[key]
+    is Amf0ECMAArray -> value[key]
+    else -> null
+}
+
+operator fun Amf0Node.get(index: Int): Amf0Node? = when (this) {
+    is Amf0StrictArray -> value[index]
+    else -> null
+}
+
+//setter functions for types
+operator fun Amf0Node.set(key: String, value: Amf0Node) {
+    when (this) {
+        is Amf0Object -> this.value[key] = value
+        is Amf0TypedObject -> this.value[key] = value
+        is Amf0ECMAArray -> this.value[key] = value
+        else -> {}
+    }
+}
+
+operator fun Amf0Node.set(index: Int, value: Amf0Node) {
+    when (this) {
+        is Amf0StrictArray -> this.value[index] = value
+        else -> {}
+    }
+}
+
+

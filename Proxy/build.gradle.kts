@@ -10,11 +10,15 @@ version = "1.0-SNAPSHOT"
 val ktor_version: String by project
 
 repositories {
-    maven("https://jitpack.io")
     mavenCentral()
+    maven("https://jitpack.io")
 }
 
 dependencies {
+    implementation("com.github.xBaank.simpleJson:core:9.0.0")
+    //arrow
+    implementation("io.arrow-kt:arrow-core:1.1.5")
+
     implementation("io.ktor:ktor-network:$ktor_version")
     implementation("io.ktor:ktor-network-tls:$ktor_version")
     //coroutines

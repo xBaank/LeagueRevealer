@@ -1,7 +1,6 @@
 package rtmpClient.amf.decoder
 
-import rtmpClient.amf.Amf0Node
-import rtmpClient.amf.Amf0Node.*
+import rtmpClient.amf.*
 import java.io.DataInputStream
 import java.io.IOException
 import java.util.*

@@ -1,28 +1,36 @@
 package leagueProxy
 
+import arrow.core.getOrElse
 import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
 import io.ktor.network.tls.*
 import io.ktor.utils.io.*
-import kotlinx.coroutines.*
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import rtmpClient.amf.get
+import rtmpClient.amf.set
+import rtmpClient.amf.toAmf0Boolean
+import rtmpClient.amf.toAmf0String
 import rtmpClient.packet.RTMPPacketDecoder
 import rtmpClient.packet.RtmpPacketEncoder
-import java.io.File
+import simpleJson.*
+import java.io.ByteArrayOutputStream
 import java.util.*
-import kotlin.time.Duration.Companion.seconds
+import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
+import kotlin.text.Charsets.UTF_8
 
-
-val mutex = Mutex()
+val names = listOf(
+    "2_Switchs",
+    "2_Neveras",
+    "2_Teles",
+    "2_Nacionalidades",
+    "2_Hermanas"
+)
 
 class LeagueProxyClient internal constructor(private val serverSocket: ServerSocket, private val clientSocket: Socket) {
-    private val writer = run {
-        val file = File("C:\\Users\\Roberto\\Documents\\logs_rtmp\\log-${UUID.randomUUID()}.txt")
-        file.delete()
-        file.writer()
-    }
-
     suspend fun start() = coroutineScope {
         while (isActive) {
             val socket = serverSocket.accept()
@@ -37,21 +45,16 @@ class LeagueProxyClient internal constructor(private val serverSocket: ServerSoc
         val clientReadChannel = clientSocket.openReadChannel()
         val clientWriteChannel = clientSocket.openWriteChannel(autoFlush = true)
 
-        var isConnected = true
-
-        launch {
-            delay(10.seconds)
-            isConnected = true
-        }
-
         //read handshakes
         handshake(serverReadChannel, clientWriteChannel, clientReadChannel, serverWriteChannel)
+
+
+        val lolClientByteArray = ByteArray(100_000)
 
         //This is lol client messages
         launch(Dispatchers.IO) {
             while (isActive) {
-                val byteArray = ByteArray(10_000)
-                val bytes = serverReadChannel.readAvailable(byteArray)
+                val bytes = serverReadChannel.readAvailable(lolClientByteArray)
 
 
 
@@ -61,20 +64,7 @@ class LeagueProxyClient internal constructor(private val serverSocket: ServerSoc
                     return@launch
                 }
 
-                mutex.withLock {
-                    writer.write("Lol client : ")
-                    writer.write(byteArray.copyOfRange(0, bytes).toHexString())
-                    writer.write("\n")
-                    writer.write("\n")
-                    writer.write("Decoded : ")
-                    writer.write(byteArray.copyOfRange(0, bytes).decodeToString())
-                    writer.write("\n")
-                    writer.write("\n")
-                    writer.flush()
-                }
-
-                println("Received from lol client $bytes bytes")
-                clientWriteChannel.writeFully(byteArray, 0, bytes)
+                clientWriteChannel.writeFully(lolClientByteArray, 0, bytes)
             }
         }
 
@@ -91,74 +81,41 @@ class LeagueProxyClient internal constructor(private val serverSocket: ServerSoc
                 bytes = rtmpPacketDecoder.originalData.size
                 byteArray = rtmpPacketDecoder.originalData
 
-                val node = rtmpPacketDecoder.readPayload()
 
-                if (bytes == -1) {
-                    println("Client closed connection")
-                    socket.close()
-                    return@launch
+                val node = try {
+                    rtmpPacketDecoder.readPayload()
+                } catch (e: Exception) {
+                    listOf()
                 }
 
-                mutex.withLock {
-                    writer.write("Backend : ")
-                    writer.write(byteArray.copyOfRange(0, bytes).toHexString())
-                    writer.write("\n")
-                    writer.write("\n")
-                    writer.write("Decoded : ")
-                    writer.write(byteArray.copyOfRange(0, bytes).decodeToString())
-                    writer.write("\n")
-                    writer.write("\n")
-                    writer.write("Node : ")
-                    writer.write(node.toString())
-                    writer.write("\n")
-                    writer.write("\n")
-                    writer.flush()
-                }
-
-                println("Received from server $bytes bytes")
                 if (node.isNotEmpty()) {
-                    RtmpPacketEncoder(serverWriteChannel, rtmpPacketDecoder.header, node).encode()
-                    /*                    //get summoner data
-                                        val node = listOf(
-                                            Amf0Null,
-                                            Amf0Null,
-                                            Amf0Null,
-                                            Amf0TypedObject(
-                                                "flex.messaging.messages.RemotingMessage", mapOf(
-                                                    "operation" to "getAllPublicSummonerDataByAccount".toAmf0String(),
-                                                    "source" to Amf0Null,
-                                                    "messageId" to UUID.randomUUID().toString().toAmf0String(),
-                                                    "timestamp" to 0.0.toAmf0Number(),
-                                                    "timeToLive" to 0.0.toAmf0Number(),
-                                                    "clientId" to UUID.randomUUID().toString().toAmf0String(),
-                                                    "destination" to "summonerService".toAmf0String(),
-                                                    "body" to listOf("19376420".toAmf0String()).toAmf0StrictArray(),
-                                                    "headers" to mapOf<String, Amf0Node>().toAmf0Object()
-                                                )
-                                            )
-                                        )
-                                        val channelMemory = ByteChannel(autoFlush = true)
-                                        val encoder = Amf0Encoder(channelMemory)
-                                        node.forEach { encoder.write(it) }
-                                        val bytes = channelMemory.availableForRead
-                                        val byteArray = ByteArray(3)
-                                        ByteBuffer.wrap(byteArray).putShort(1, bytes.toShort())
-                                        val encode = channelMemory.readAvailable(ByteArray(bytes))
 
-                                        val rtmpPacketHeader0 = RTMPPacketHeader0(
-                                            20,
-                                            0,
-                                            byteArrayOf(0, 0, 0),
-                                            byteArray,
-                                            0,
-                                            byteArrayOf(0, 0, 0, 0),
-                                            byteArrayOf(20, 0) + byteArray + byteArrayOf(0, 0, 0) + byteArrayOf(0, 0, 0, 0)
-                                        )
-                                        channelMemory.close()
+                    val body = node.getOrNull(3)?.get("body")
+                    val isCompressed = body?.get("compressedPayload")?.toAmf0Boolean()?.value ?: false
 
-                                        serverWriteChannel.writeFully(rtmpPacketHeader0.headerData + channelMemory.toByteArray())*/
+                    val name = body?.get("methodName")?.toAmf0String()?.value ?: ""
 
-
+                    if (isCompressed && name == "tbdGameDtoV1") {
+                        val payloadGzip = body?.get("payload").toAmf0String()?.value
+                        val bodyStream = payloadGzip?.base64Ungzip() ?: throw Exception("No payloadGzip")
+                        val payload = JsonReader(bodyStream).read().getOrElse { throw it }
+                        val localCellID = payload["championSelectState"]["localPlayerCellId"].asInt().getOrNull()
+                        if (payload["phaseName"].asString().getOrNull() == "CHAMPION_SELECT") {
+                            payload["championSelectState"]["cells"]["alliedTeam"].asArray().getOrNull()?.forEach {
+                                if (localCellID != it["cellId"].asInt().getOrNull()) {
+                                    if (it["nameVisibilityType"].isRight()) it["nameVisibilityType"] = "VISIBLE"
+                                }
+                            }
+                            println("Changing names")
+                            body!!["payload"] = payload.serialize().base64Gzip().toAmf0String()
+                        }
+                        val new = payload.serialize().base64Gzip()
+                        body!!["payload"] = new.toAmf0String()
+                    }
+                    RtmpPacketEncoder(serverWriteChannel, rtmpPacketDecoder.header).spoof(
+                        node,
+                        rtmpPacketDecoder.originalPayloadData
+                    )
                 } else
                     serverWriteChannel.writeFully(byteArray, 0, bytes)
             }
@@ -205,4 +162,22 @@ suspend fun LeagueProxyClient(host: String, port: Int, proxyHost: String, proxyP
 
 
 fun ByteArray.toHexString() = joinToString("") { "%02x".format(it) }
+
+fun String.base64Ungzip(): String {
+    val gzipped: ByteArray = Base64.getDecoder().decode(this.toByteArray(UTF_8))
+    val `in` = GZIPInputStream(gzipped.inputStream())
+    return `in`.bufferedReader(UTF_8).use { it.readText() }
+}
+
+fun String.base64Gzip(): String {
+    val output = ByteArrayOutputStream()
+
+    GZIPOutputStream(output).use {
+        it.write(this.toByteArray(UTF_8))
+        it.flush()
+    }
+
+    val encoded = Base64.getEncoder().encode(output.toByteArray())
+    return String(encoded, UTF_8)
+}
 

@@ -1,9 +1,7 @@
 package rtmpClient.amf.encoder
 
 import io.ktor.utils.io.*
-import rtmpClient.amf.Amf0Node
-import rtmpClient.amf.Amf0Node.*
-import rtmpClient.amf.toAmf0String
+import rtmpClient.amf.*
 import rtmpClient.packet.CHUNK_SIZE
 import java.nio.ByteBuffer
 
@@ -92,7 +90,7 @@ class Amf0Encoder(channel: ByteWriteChannel) {
 
         writeStringKey(obj.name.toAmf0String())
         for (entry in obj.value) {
-            if (entry.key == "clientSystemStates")
+            if (entry.key == "configs")
                 println()
             writeStringKey(entry.key.toAmf0String())
             write(entry.value)
