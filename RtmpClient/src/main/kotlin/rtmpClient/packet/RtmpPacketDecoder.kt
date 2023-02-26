@@ -9,6 +9,7 @@ internal const val CHUNCK_HEADER_TYPE_0: Byte = 0x00
 internal const val CHUNCK_HEADER_TYPE_1: Byte = 0x01
 internal const val CHUNCK_HEADER_TYPE_2: Byte = 0x02
 internal const val CHUNCK_HEADER_TYPE_3: Byte = 0x03
+internal const val CHUNK_SIZE = 128
 
 
 internal const val TIMESTAMP_SIZE = 3
@@ -31,63 +32,47 @@ class RTMPPacketDecoder internal constructor(
         when (header) {
             is RTMPPacketHeader0 -> {
                 if (header.messageTypeId.toInt() != 0x14) return listOf()
-
                 return AMF0Decoder(payloadData).decodeAll()
             }
 
             is RTMPPacketHeader1 -> {
                 if (header.messageTypeId.toInt() != 0x14) return listOf()
-
                 return AMF0Decoder(payloadData).decodeAll()
             }
 
             is RTMPPacketHeader2 -> {
-                TODO()
+                return listOf()
             }
 
             is RTMPPacketHeader3 -> {
-                TODO()
+                return listOf()
             }
         }
     }
 }
 
-suspend fun ByteReadChannel.readAllFixedPayload(offset: Int, length: Int): Pair<ByteArray, ByteArray> {
-    var data = ByteArray(length)
-    val CHUNK_SIZE = 128
+suspend fun ByteReadChannel.readChunkedPayload(length: Int): Pair<ByteArray, ByteArray> {
+    var data = ByteArray(0)
+    var originalData = ByteArray(0)
     val chunks = length / CHUNK_SIZE
+    val remainder = length % CHUNK_SIZE
+
     for (i in 0 until chunks) {
         val chunk = ByteArray(CHUNK_SIZE)
-        readFully(chunk, offset, CHUNK_SIZE)
-    }
-    var originalData = ByteArray(length)
-    println("Reading fixed payload $length")
-    readFully(originalData, offset, length)
-    var data = originalData.filterIndexed { index, byte -> index == 0 || (index % 128 != 0 && byte != 0xC3.toByte()) }
-        .toByteArray()
-    var remainingLength = length - data.size
+        if (i != 0) readByte()
+        readFully(chunk, 0, CHUNK_SIZE)
 
-    while (remainingLength > 0) {
-        if (remainingLength == 162) {
-            println("Remaining length is 162")
-        }
-        val originalRemainingData = ByteArray(remainingLength)
-        println("Reading remaining payload $remainingLength")
-        val read = readAvailable(originalRemainingData, 0, remainingLength)
-        if (read == -1) {
-            println("Read -1")
-            break
-        }
-        if (read != remainingLength) {
-            println("Read $read instead of $remainingLength")
-        }
-        val remainingData = originalRemainingData.filter { it != 0xC3.toByte() }.toByteArray()
-
-        data += remainingData
-        originalData += originalRemainingData
-        remainingLength = length - data.size
+        data += chunk
+        originalData += if (i == 0) chunk else byteArrayOf(0xC3.toByte()) + chunk
     }
 
+    if (remainder > 0) {
+        val chunk = ByteArray(remainder)
+        if (chunks != 0) readByte()
+        readFully(chunk, 0, remainder)
+        data += chunk
+        originalData += if (chunks == 0) chunk else byteArrayOf(0xC3.toByte()) + chunk
+    }
     return data to originalData
 }
 
@@ -103,12 +88,12 @@ suspend fun RTMPPacketDecoder(channel: ByteReadChannel): RTMPPacketDecoder {
         when (header) {
             is RTMPPacketHeader0 ->
                 if (header.messageTypeId == 0x14.toByte())
-                    channel.readAllFixedPayload(0, header.lengthAsInt)
+                    channel.readChunkedPayload(header.lengthAsInt)
                 else
                     channel.readAllPayload(0, header.lengthAsInt)
 
             is RTMPPacketHeader1 -> if (header.messageTypeId == 0x14.toByte())
-                channel.readAllFixedPayload(0, header.lengthAsInt)
+                channel.readChunkedPayload(header.lengthAsInt)
             else
                 channel.readAllPayload(0, header.lengthAsInt)
 

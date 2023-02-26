@@ -8,9 +8,11 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import rtmpClient.packet.RTMPPacketDecoder
+import rtmpClient.packet.RtmpPacketEncoder
 import java.io.File
 import java.util.*
 import kotlin.time.Duration.Companion.seconds
+
 
 val mutex = Mutex()
 
@@ -48,16 +50,7 @@ class LeagueProxyClient internal constructor(private val serverSocket: ServerSoc
         //This is lol client messages
         launch(Dispatchers.IO) {
             while (isActive) {
-
-                /*val rtmpPacketDecoder = RTMPPacketDecoder(serverReadChannel)
-                val rtmpPacket = rtmpPacketDecoder.readPayload()
-                println(rtmpPacket)
-
-                val bytes = rtmpPacketDecoder.data.size
-                val byteArray = rtmpPacketDecoder.data*/
-
                 val byteArray = ByteArray(10_000)
-
                 val bytes = serverReadChannel.readAvailable(byteArray)
 
 
@@ -92,16 +85,13 @@ class LeagueProxyClient internal constructor(private val serverSocket: ServerSoc
                 val bytes: Int
                 val byteArray: ByteArray
 
-                if (isConnected) {
-                    val rtmpPacketDecoder = RTMPPacketDecoder(clientReadChannel)
-                    bytes = rtmpPacketDecoder.originalData.size
-                    byteArray = rtmpPacketDecoder.originalData
-                    val node = rtmpPacketDecoder.readPayload()
-                    println(node)
-                } else {
-                    byteArray = ByteArray(10_000)
-                    bytes = clientReadChannel.readAvailable(byteArray)
-                }
+
+                val rtmpPacketDecoder = RTMPPacketDecoder(clientReadChannel)
+
+                bytes = rtmpPacketDecoder.originalData.size
+                byteArray = rtmpPacketDecoder.originalData
+
+                val node = rtmpPacketDecoder.readPayload()
 
                 if (bytes == -1) {
                     println("Client closed connection")
@@ -118,11 +108,59 @@ class LeagueProxyClient internal constructor(private val serverSocket: ServerSoc
                     writer.write(byteArray.copyOfRange(0, bytes).decodeToString())
                     writer.write("\n")
                     writer.write("\n")
+                    writer.write("Node : ")
+                    writer.write(node.toString())
+                    writer.write("\n")
+                    writer.write("\n")
                     writer.flush()
                 }
 
                 println("Received from server $bytes bytes")
-                serverWriteChannel.writeFully(byteArray, 0, bytes)
+                if (node.isNotEmpty()) {
+                    RtmpPacketEncoder(serverWriteChannel, rtmpPacketDecoder.header, node).encode()
+                    /*                    //get summoner data
+                                        val node = listOf(
+                                            Amf0Null,
+                                            Amf0Null,
+                                            Amf0Null,
+                                            Amf0TypedObject(
+                                                "flex.messaging.messages.RemotingMessage", mapOf(
+                                                    "operation" to "getAllPublicSummonerDataByAccount".toAmf0String(),
+                                                    "source" to Amf0Null,
+                                                    "messageId" to UUID.randomUUID().toString().toAmf0String(),
+                                                    "timestamp" to 0.0.toAmf0Number(),
+                                                    "timeToLive" to 0.0.toAmf0Number(),
+                                                    "clientId" to UUID.randomUUID().toString().toAmf0String(),
+                                                    "destination" to "summonerService".toAmf0String(),
+                                                    "body" to listOf("19376420".toAmf0String()).toAmf0StrictArray(),
+                                                    "headers" to mapOf<String, Amf0Node>().toAmf0Object()
+                                                )
+                                            )
+                                        )
+                                        val channelMemory = ByteChannel(autoFlush = true)
+                                        val encoder = Amf0Encoder(channelMemory)
+                                        node.forEach { encoder.write(it) }
+                                        val bytes = channelMemory.availableForRead
+                                        val byteArray = ByteArray(3)
+                                        ByteBuffer.wrap(byteArray).putShort(1, bytes.toShort())
+                                        val encode = channelMemory.readAvailable(ByteArray(bytes))
+
+                                        val rtmpPacketHeader0 = RTMPPacketHeader0(
+                                            20,
+                                            0,
+                                            byteArrayOf(0, 0, 0),
+                                            byteArray,
+                                            0,
+                                            byteArrayOf(0, 0, 0, 0),
+                                            byteArrayOf(20, 0) + byteArray + byteArrayOf(0, 0, 0) + byteArrayOf(0, 0, 0, 0)
+                                        )
+                                        channelMemory.close()
+
+                                        serverWriteChannel.writeFully(rtmpPacketHeader0.headerData + channelMemory.toByteArray())*/
+
+
+                } else
+                    serverWriteChannel.writeFully(byteArray, 0, bytes)
             }
         }
     }

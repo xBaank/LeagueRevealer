@@ -10,6 +10,7 @@ version = "1.0-SNAPSHOT"
 val ktor_version: String by project
 
 repositories {
+    maven("https://jitpack.io")
     mavenCentral()
 }
 

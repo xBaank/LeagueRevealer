@@ -48,7 +48,7 @@ class AMF0Decoder(data: ByteArray) {
         val length = input.readShort()
         val buffer = ByteArray(length.toInt())
         input.readFully(buffer)
-        return Amf0String(buffer.decodeToString())
+        return Amf0String(String(buffer, Charsets.UTF_8))
     }
 
 

@@ -33,7 +33,7 @@ sealed interface Amf0Node {
         }
     }
 
-    class Amf0TypedObject(val name: String, val value: Map<String, Amf0Node>) : Amf0Node {
+    data class Amf0TypedObject(val name: String, val value: Map<String, Amf0Node>) : Amf0Node {
         companion object {
             const val TYPE = 0x10
         }
@@ -78,5 +78,9 @@ sealed interface Amf0Node {
 fun Number.toAmf0Number(): Amf0Number = Amf0Number(this.toDouble())
 fun Boolean.toAmf0Boolean(): Amf0Boolean = Amf0Boolean(this)
 fun String.toAmf0String(): Amf0String = Amf0String(this)
+
+fun Nothing?.toAmf0Null(): Amf0Null = Amf0Null
 fun Map<String, Amf0Node>.toAmf0Object(): Amf0Object = Amf0Object(this)
 fun Map<String, Amf0Node>.toAmf0ECMAArray(): Amf0ECMAArray = Amf0ECMAArray(this)
+fun Date.toAmf0Date(): Amf0Date = Amf0Date(this)
+fun List<Amf0Node>.toAmf0StrictArray(): Amf0StrictArray = Amf0StrictArray(this)
