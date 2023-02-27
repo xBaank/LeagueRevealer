@@ -1,0 +1,8 @@
+# Use a base image that supports the JVM
+FROM openjdk:17-jdk-slim
+
+COPY Proxy/build/libs/Proxy-1.0-SNAPSHOT-standalone.jar /
+WORKDIR /
+
+# Set the command to run your application
+CMD ["java", "-jar", "/Proxy-1.0-SNAPSHOT-standalone.jar"]

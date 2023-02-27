@@ -22,6 +22,8 @@ import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 import kotlin.text.Charsets.UTF_8
 
+private const val SOLOQ_ID = 420
+
 class LeagueProxyClient internal constructor(
     val serverSocket: ServerSocket,
     private val host: String,
@@ -95,33 +97,36 @@ class LeagueProxyClient internal constructor(
                     val body = node.getOrNull(3)?.get("body")
                     val isCompressed = body?.get("compressedPayload")?.toAmf0Boolean()?.value ?: false
 
-                    val name = body?.get("methodName")?.toAmf0String()?.value ?: ""
+                    println(node)
 
-                    if (isCompressed && name == "tbdGameDtoV1") {
+                    if (isCompressed) {
                         val payloadGzip = body?.get("payload").toAmf0String()?.value
                         val bodyStream = payloadGzip?.base64Ungzip() ?: throw Exception("No payloadGzip")
                         val payload = JsonReader(bodyStream).read().getOrElse { throw it }
-                        val localCellID = payload["championSelectState"]["localPlayerCellId"].asInt().getOrNull()
-                        val phaseName = payload["phaseName"].asString().getOrNull()
-                        val subPhase = payload["championSelectState"]["subPhase"].asString().getOrNull()
-                        if (phaseName == "CHAMPION_SELECT" && subPhase == "PLANNING") {
+
+                        val queueId = payload["queueId"].asInt().getOrNull()
+                        //val phaseName = payload["phaseName"].asString().getOrNull() Better to remove, just check for queueID, But its should be CHAMPION_SELECT
+                        //val subPhase = payload["championSelectState"]["subphase"].asString().getOrNull() Better to remove, just check for queueID, But it should be PLANNING
+
+                        println(payload.serialize())
+
+                        if (queueId != null) {
+                            val localCellID = payload["championSelectState"]["localPlayerCellId"].asInt().getOrNull()
+
                             payload["championSelectState"]["cells"]["alliedTeam"].asArray().getOrNull()?.forEach {
                                 if (localCellID != it["cellId"].asInt().getOrNull()) {
-                                    if (it["nameVisibilityType"].isRight()) it["nameVisibilityType"] = "VISIBLE"
+                                    if (it["nameVisibilityType"].isRight()) it["nameVisibilityType"] = "UNHIDDEN"
                                 }
                             }
                             body!!["payload"] = payload.serialize().base64Gzip().toAmf0String()
-                        }
 
-                        val new = payload.serialize().base64Gzip()
-                        body!!["payload"] = new.toAmf0String()
-                        RtmpPacketEncoder(serverWriteChannel, rtmpPacketDecoder.header).spoof(
-                            node,
-                            rtmpPacketDecoder.originalPayloadData
-                        )
-                        continue
+                            println("Spoofing packet")
+                        }
                     }
-                    serverWriteChannel.writeFully(byteArray, 0, bytes)
+                    RtmpPacketEncoder(serverWriteChannel, rtmpPacketDecoder.header).spoof(
+                        node,
+                        rtmpPacketDecoder.originalPayloadData
+                    )
                 } else
                     serverWriteChannel.writeFully(byteArray, 0, bytes)
             }

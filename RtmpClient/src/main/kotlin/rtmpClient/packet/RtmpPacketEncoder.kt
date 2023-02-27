@@ -7,7 +7,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import rtmpClient.amf.Amf0Node
 import rtmpClient.amf.encoder.Amf0Encoder
-import java.nio.ByteBuffer
 
 class RtmpPacketEncoder(val writeChannel: ByteWriteChannel, val header: RTMPPacketHeader) {
     suspend fun encode(payload: List<Amf0Node>) {
@@ -22,14 +21,14 @@ class RtmpPacketEncoder(val writeChannel: ByteWriteChannel, val header: RTMPPack
         val memoChannel = ByteChannel()
         val encoder = Amf0Encoder(memoChannel)
 
-        val buffer = ByteArray(1024)
+        val buffer = ByteArray(4096 * 4)
         var data = ByteArray(0)
 
         val job = launch(Dispatchers.IO) {
             while (isActive) {
                 val read = memoChannel.readAvailable(buffer)
                 data += buffer.sliceArray(0 until read)
-                if (read == -1 || read == 0) {
+                if (read == -1) {
                     break
                 }
             }
@@ -39,14 +38,13 @@ class RtmpPacketEncoder(val writeChannel: ByteWriteChannel, val header: RTMPPack
             payload.forEach {
                 encoder.write(it)
             }
+            memoChannel.close()
         }
 
         job2.join()
-        memoChannel.close()
         job.join()
 
         val chunkSize = original.size / (original.size - header.lengthAsInt)
-
 
         val newHeader = when (header) {
             is RTMPPacketHeader0 -> spoofHeader(data, header, chunkSize)
@@ -66,8 +64,14 @@ class RtmpPacketEncoder(val writeChannel: ByteWriteChannel, val header: RTMPPack
 
     private fun spoofHeader(data: ByteArray, original: RTMPPacketHeader0, chunkSize: Int): RTMPPacketHeader0 {
         val lengthArray = ByteArray(3)
-        val readlDataSize = data.size - (data.size / chunkSize)
-        ByteBuffer.wrap(lengthArray).putShort(1, readlDataSize.toShort())
+        val readlDataSize = (data.size - (data.size / chunkSize)) * 256
+        val b3 = (readlDataSize shr 8 and 0xFF).toByte()
+        val b2 = (readlDataSize shr 16 and 0xFF).toByte()
+        val b1 = (readlDataSize shr 24 and 0xFF).toByte()
+        //ByteBuffer.wrap(lengthArray).putShort(1, readlDataSize.toShort())
+        lengthArray[0] = b1
+        lengthArray[1] = b2
+        lengthArray[2] = b3
         val rtmpPacketHeader0 = RTMPPacketHeader0(
             chunkHeaderType = original.chunkHeaderType,
             channelId = original.channelId,

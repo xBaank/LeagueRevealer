@@ -86,16 +86,24 @@ suspend fun RTMPPacketDecoder(channel: ByteReadChannel): RTMPPacketDecoder {
     val header = readHeader(channel)
     val payloadData =
         when (header) {
-            is RTMPPacketHeader0 ->
+            is RTMPPacketHeader0 -> {
+                if (header.messageTypeId == 0x01.toByte())
+                    println("Set chunk size")
                 if (header.messageTypeId == 0x14.toByte())
                     channel.readChunkedPayload(header.lengthAsInt)
                 else
                     channel.readAllPayload(0, header.lengthAsInt)
+            }
 
-            is RTMPPacketHeader1 -> if (header.messageTypeId == 0x14.toByte())
-                channel.readChunkedPayload(header.lengthAsInt)
-            else
-                channel.readAllPayload(0, header.lengthAsInt)
+            is RTMPPacketHeader1 -> {
+                if (header.messageTypeId == 0x01.toByte())
+                    println("Set chunk size2 ")
+
+                if (header.messageTypeId == 0x14.toByte())
+                    channel.readChunkedPayload(header.lengthAsInt)
+                else
+                    channel.readAllPayload(0, header.lengthAsInt)
+            }
 
             else -> channel.readAllPayload(0, header.lengthAsInt)
         }
