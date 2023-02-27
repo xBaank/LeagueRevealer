@@ -27,7 +27,7 @@ fun main(args: Array<String>): Unit = SuspendApp {
         launch(Dispatchers.IO) {
             val proxyClient = mutex.withLock {
                 println("Starting $region proxy on $port")
-                val proxyClient = LeagueProxyClient("127.0.0.1", port, lcds.host, lcds.port)
+                val proxyClient = LeagueProxyClient(port, lcds.host, lcds.port)
                 port += 1
                 proxyClient
             }

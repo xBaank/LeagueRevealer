@@ -158,7 +158,7 @@ class LeagueProxyClient internal constructor(
     }
 }
 
-fun LeagueProxyClient(proxyHost: String, proxyPort: Int, host: String, port: Int): LeagueProxyClient {
+fun LeagueProxyClient(proxyPort: Int, host: String, port: Int): LeagueProxyClient {
     val selectorManager = SelectorManager(Dispatchers.IO)
     val socketServer = aSocket(selectorManager).tcp().bind(port = proxyPort)
 
