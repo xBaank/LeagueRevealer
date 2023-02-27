@@ -1,6 +1,5 @@
 plugins {
     kotlin("jvm")
-    application
 }
 
 group = "org.xBaank"
@@ -24,9 +23,5 @@ tasks.test {
 }
 
 kotlin {
-    jvmToolchain(17)
-}
-
-application {
-    mainClass.set("MainKt")
+    jvmToolchain(8)
 }

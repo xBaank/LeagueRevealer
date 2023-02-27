@@ -56,17 +56,12 @@ class RtmpPacketEncoder(val writeChannel: ByteWriteChannel, val header: RTMPPack
         }
 
 
-        if (newHeader.headerData contentEquals header.headerData)
-            println("Spoofed header is the same as original")
-        else
-            println("Spoofed header is different from original")
-        println(data contentEquals original)
-        println("Writing spoofed header")
+
+
         writeChannel.writeFully(newHeader.headerData)
         data.forEach {
             writeChannel.writeByte(it)
         }
-        println("Written spoofed header")
     }
 
     private fun spoofHeader(data: ByteArray, original: RTMPPacketHeader0, chunkSize: Int): RTMPPacketHeader0 {

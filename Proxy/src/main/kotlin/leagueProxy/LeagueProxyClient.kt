@@ -22,24 +22,29 @@ import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 import kotlin.text.Charsets.UTF_8
 
-val names = listOf(
-    "2_Switchs",
-    "2_Neveras",
-    "2_Teles",
-    "2_Nacionalidades",
-    "2_Hermanas"
-)
-
-class LeagueProxyClient internal constructor(private val serverSocket: ServerSocket, private val clientSocket: Socket) {
+class LeagueProxyClient internal constructor(
+    val serverSocket: ServerSocket,
+    private val host: String,
+    private val port: Int
+) {
     suspend fun start() = coroutineScope {
         while (isActive) {
             val socket = serverSocket.accept()
             println("Accepted connection from ${socket.remoteAddress}")
-            launch(Dispatchers.IO) { handleSocket(socket) }
+            launch(Dispatchers.IO) {
+                runCatching {
+                    handleSocket(socket)
+                }.onFailure {
+                    println("Error handling socket: ${socket.remoteAddress}")
+                }
+            }
         }
     }
 
     private suspend fun handleSocket(socket: Socket) = coroutineScope {
+        val selectorManager = SelectorManager(Dispatchers.IO)
+        val clientSocket = aSocket(selectorManager).tcp().connect(host, port).tls(Dispatchers.IO)
+
         val serverReadChannel = socket.openReadChannel()
         val serverWriteChannel = socket.openWriteChannel(autoFlush = true)
         val clientReadChannel = clientSocket.openReadChannel()
@@ -56,10 +61,8 @@ class LeagueProxyClient internal constructor(private val serverSocket: ServerSoc
             while (isActive) {
                 val bytes = serverReadChannel.readAvailable(lolClientByteArray)
 
-
-
                 if (bytes == -1) {
-                    println("Server closed connection")
+                    println("Socket ${socket.remoteAddress} closed connection")
                     socket.close()
                     return@launch
                 }
@@ -89,7 +92,6 @@ class LeagueProxyClient internal constructor(private val serverSocket: ServerSoc
                 }
 
                 if (node.isNotEmpty()) {
-
                     val body = node.getOrNull(3)?.get("body")
                     val isCompressed = body?.get("compressedPayload")?.toAmf0Boolean()?.value ?: false
 
@@ -100,22 +102,26 @@ class LeagueProxyClient internal constructor(private val serverSocket: ServerSoc
                         val bodyStream = payloadGzip?.base64Ungzip() ?: throw Exception("No payloadGzip")
                         val payload = JsonReader(bodyStream).read().getOrElse { throw it }
                         val localCellID = payload["championSelectState"]["localPlayerCellId"].asInt().getOrNull()
-                        if (payload["phaseName"].asString().getOrNull() == "CHAMPION_SELECT") {
+                        val phaseName = payload["phaseName"].asString().getOrNull()
+                        val subPhase = payload["championSelectState"]["subPhase"].asString().getOrNull()
+                        if (phaseName == "CHAMPION_SELECT" && subPhase == "PLANNING") {
                             payload["championSelectState"]["cells"]["alliedTeam"].asArray().getOrNull()?.forEach {
                                 if (localCellID != it["cellId"].asInt().getOrNull()) {
                                     if (it["nameVisibilityType"].isRight()) it["nameVisibilityType"] = "VISIBLE"
                                 }
                             }
-                            println("Changing names")
                             body!!["payload"] = payload.serialize().base64Gzip().toAmf0String()
                         }
+
                         val new = payload.serialize().base64Gzip()
                         body!!["payload"] = new.toAmf0String()
+                        RtmpPacketEncoder(serverWriteChannel, rtmpPacketDecoder.header).spoof(
+                            node,
+                            rtmpPacketDecoder.originalPayloadData
+                        )
+                        continue
                     }
-                    RtmpPacketEncoder(serverWriteChannel, rtmpPacketDecoder.header).spoof(
-                        node,
-                        rtmpPacketDecoder.originalPayloadData
-                    )
+                    serverWriteChannel.writeFully(byteArray, 0, bytes)
                 } else
                     serverWriteChannel.writeFully(byteArray, 0, bytes)
             }
@@ -152,16 +158,13 @@ class LeagueProxyClient internal constructor(private val serverSocket: ServerSoc
     }
 }
 
-suspend fun LeagueProxyClient(host: String, port: Int, proxyHost: String, proxyPort: Int): LeagueProxyClient {
+fun LeagueProxyClient(proxyHost: String, proxyPort: Int, host: String, port: Int): LeagueProxyClient {
     val selectorManager = SelectorManager(Dispatchers.IO)
-    val socketServer = aSocket(selectorManager).tcp().bind(host, port)
-    val socketClient = aSocket(selectorManager).tcp().connect(proxyHost, proxyPort).tls(Dispatchers.IO)
+    val socketServer = aSocket(selectorManager).tcp().bind(port = proxyPort)
 
-    return LeagueProxyClient(socketServer, socketClient)
+    return LeagueProxyClient(socketServer, host, port)
 }
 
-
-fun ByteArray.toHexString() = joinToString("") { "%02x".format(it) }
 
 fun String.base64Ungzip(): String {
     val gzipped: ByteArray = Base64.getDecoder().decode(this.toByteArray(UTF_8))
